@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>列表</title>
+	<style>
+		#table td{
+			border: 1px solid #ccc;
+			padding: 10px;
+		}
+		#showAddDiv,#showUpdDiv{
+			display: none;
+		}
+		.page.active{
+			border: 1px solid green;
+		}
+	</style>
+</head>
+<body>
+	<div>这个html，是由koa静态服务器输出的，与接口是同源的</div>
+	<div>
+		<input type="text" placeholder="ID，精确匹配" id="searchId">
+		<input type="text" placeholder="关键字，模糊查询" id="searchVal">
+		
+		<button id="searchBtn">搜索</button>
+		<button id="showAdd">添加用户</button>
+		<button id="export">导出至Excel</button>
+	</div>
+	<div>按更新时间，倒序排序</div>
+	<div>
+		<table id=table cellpadding="0" cellspacing="0">
+			<thead>
+				<tr>
+					<td>操作</td>
+					<td>id</td>
+					<td>姓名</td>
+					<td>添加时间</td>
+					<td>更新时间</td>
+					<td>操作</td>
+				</tr>
+			</thead>
+			<tbody></tbody>
+		</table>
+
+		<div style="margin-left:400px;">
+			总数：<span id="allNum"></span>,一页5条记录，
+			页数：<span id="pageNo"></span>/<span id="allPageNo"></span>
+			<span id="page"></span>
+		</div>
+		
+		<button id="delDuo">
+			批量删除
+		</button>
+	</div>
+
+	
+
+	<div id="showAddDiv">
+		<input type="text" id="newTitle">
+		<button id="addTitle">确认添加</button>
+	</div>
+
+	<div id="showUpdDiv">
+		<input type="text" id="updTitle">
+		<input type="hidden" id="updId">
+		<button id="updTitleBtn">确认修改</button>
+	</div>
+
+
+	<script src="http://js.letvcdn.com/lc04_lecloud/201602/22/16/48/libs/libs/jquery.js"></script>
+	
+	<script>
+		$(function(){
+			Util = {
+				formatTime:function(s){
+					s *= 1;
+					if(!s){
+						return ""
+					}else{
+						var now = new Date(s);
+						var year = now.getFullYear();
+						var month = now.getMonth() + 1;
+						var date = now.getDate();
+						var hour = now.getHours();
+						var minute = now.getMinutes();
+						var second = now.getSeconds();
+						month = month < 10 ? "0" + month : month;
+						date = date < 10 ? "0" + date : date;
+						hour = hour < 10 ? "0" + hour : hour;
+						minute = minute < 10 ? "0" + minute : minute;
+						second = second < 10 ? "0" + second : second;
+						return year + "-" + month + "-" + date + " " + hour + ":" + minute + ":" + second;
+					}
+				}
+			}
+			var page = 1;
+
+			function loadData(data){
+				data.page = page;
+				data.rows = 5;
+				$.ajax({
+					url:"./user/getList",
+					type:"get",
+					data:data,
+					dataType:"json",
+					success:function(data){
+						console.log(data)
+						var allNum = data.num;
+						var data = data.data;
+						var s = ""
+						for(var i=0;i<data.length;i++){
+							s += "<tr><td><input type='checkbox' class='check' data-id="+data[i].id+" ></td>"+
+										"<td>"+data[i].id+"</td><td>"+data[i].title+"</td>"+
+										"<td>"+Util.formatTime(data[i].creatTime)+"</td>"+
+										"<td>"+Util.formatTime(data[i].updateTime)+"</td>"+
+										"<td>"+
+											"<button class='upd' data-id="+data[i].id+" data-title="+data[i].title+">更新</button>"+
+											"<button class='del' data-id="+data[i].id+">删除</button></td></tr>"
+						}
+						$("#table tbody").html(s);
+
+						$("#allNum").html(allNum);
+						$("#pageNo").html(page);
+						var pageNums = Math.ceil(allNum/5);
+						$("#allPageNo").html(pageNums);
+						var pageS = ""
+						for(var i=1;i<pageNums+1;i++){
+							activeClass = "";
+							if(i == page){
+								activeClass = "active";
+							}
+							pageS += "<button class='page "+activeClass+"' data-page='"+i+"'>"+i+"</button>";
+						}
+						$("#page").html(pageS)
+					},
+					error:function(){
+						console.log(arguments)
+					}
+				})
+			}
+
+			loadData({});
+
+			$("#searchBtn").click(function(){
+				var s = $("#searchVal").val().trim();
+				var id = $("#searchId").val().trim();
+				page = 1;
+				var obj = {};
+
+				if(s){
+					obj.key = s;
+				}
+				if(id){
+					obj.id = id;
+				}
+				loadData(obj)
+			});
+
+			$("#showAdd").click(function(){
+				$("#showAddDiv").show();
+			});
+
+			$("#addTitle").click(function(){
+				var s = $("#newTitle").val().trim();
+				if(s){
+					$.ajax({
+						url:"./user/creat",
+						type:"post",
+						data:{title:s},
+						dataType:"json",
+						success:function(data){
+							console.log(data)
+							history.go(0)
+						},
+						error:function(){
+							console.log(arguments)
+						}
+					})
+				}else{
+					alert("请填写")
+				}
+			});
+
+			$("#table").on('click','.del',function(){
+				var id = $(this).attr("data-id");
+				var s = window.confirm("确认要删除ID："+id+"的用户么？")
+				if(s){
+					$.ajax({
+						url:"./user/del",
+						type:"post",
+						data:{id:id},
+						dataType:"json",
+						success:function(data){
+							console.log(data)
+							history.go(0)
+						},
+						error:function(){
+							console.log(arguments)
+						}
+					})
+				}
+			});
+
+			$("#table").on('click','.upd',function(){
+				var id = $(this).attr("data-id");
+				var title = $(this).attr("data-title");
+				$("#updId").val(id)
+				$("#updTitle").val(title)
+				
+				$("#showUpdDiv").show();
+			});
+
+			$("#updTitleBtn").click(function(){
+				var s = $("#updTitle").val().trim();
+				var id = $("#updId").val().trim();
+				if(s){
+					$.ajax({
+						url:"./user/update",
+						type:"post",
+						data:{title:s,id:id},
+						dataType:"json",
+						success:function(data){
+							console.log(data)
+							history.go(0)
+						},
+						error:function(){
+							console.log(arguments)
+						}
+					})
+				}else{
+					alert("请填写")
+				}
+			});
+
+			$("#page").on("click",".page",function(){
+				page = $(this).attr("data-page")
+				loadData({});
+			});
+
+			$("#delDuo").click(function(){
+				var s = "";
+				$("#table").find(".check:checked").each(function(){
+					s += $(this).attr("data-id")+","
+				});
+				if(s){
+					var r = window.confirm("确认要删除ID："+s+"的用户集合么？")
+					if(r){
+						$.ajax({
+							url:"./user/del",
+							type:"post",
+							data:{id:s},
+							dataType:"json",
+							success:function(data){
+								console.log(data)
+								history.go(0)
+							},
+							error:function(){
+								console.log(arguments)
+							}
+						})
+					}
+				}else{
+					alert("请至少选择一个")
+				}
+			});
+
+			$("#export").click(function(){
+				var r = window.confirm("确认全部导出来？")
+				if(r){
+					$.ajax({
+						url:"./user/exportToExcel",
+						type:"post",
+						dataType:"json",
+						success:function(data){
+							if(data.code == 200){
+								window.open(data.url)
+							}else{
+								alert(data.msg)
+							}
+						},
+						error:function(){
+							console.log(arguments)
+						}
+					})
+				}
+			});
+		});
+	</script>
+</body>
+</html>
